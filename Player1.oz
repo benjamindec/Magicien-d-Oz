@@ -36,15 +36,15 @@ in
     fun {RandomDir Directions Pos}
         TmpPos Ind Dir
     in
-        Ind = ({OS.rand} mod {List.length Directions}) + 1
-        {List.nth Directions Ind ?Dir}
-        TmpPos = {MovePos Pos.1 Dir}
-
-        if {MoveAllowed TmpPos} andthen {Not {Visited TmpPos Pos}} then
-            Dir
-        else
-            if {List.length Directions} == 0 then
+        if {List.length Directions} == 0 then
                 surface
+        else
+            Ind = ({OS.rand} mod {List.length Directions}) + 1
+            {List.nth Directions Ind ?Dir}
+            TmpPos = {MovePos Pos.1 Dir}
+
+            if {MoveAllowed TmpPos} andthen {Not {Visited TmpPos Pos}} then
+                Dir
             else
                 {RandomDir {List.subtract Directions Dir} Pos}
             end
@@ -104,7 +104,11 @@ in
                 Dir = {RandomDir [north east south west] Position}
                 Pos = {MovePos Position.1 Dir}
                 ID2 = ID
-                {TreatStream T ID2 Pos|Position Weapon Surface Dir|Direction}
+                case Dir of surface then
+                    {TreatStream T ID2 Pos|nil Weapon Surface Dir|Direction}
+                [] _ then
+                    {TreatStream T ID2 Pos|Position Weapon Surface Dir|Direction}
+                end
             [] dive()|T then
                 skip
             [] chargeItem(?ID ?KindItem)|T then
@@ -152,7 +156,7 @@ in
     in
         {NewPort Stream Port}
         thread
-            {TreatStream Stream id(id:ID color:Color name:ID) 0 Weapon 1 Direction}
+            {TreatStream Stream id(id:ID color:Color name:ID) nil Weapon 1 Direction}
         end
         Port
     end

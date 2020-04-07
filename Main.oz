@@ -10,18 +10,21 @@ define
     InitPlayers
     TurnByTurn
     PlayersLeft
+    SurfaceStatus
+
     Broadcast
+
 in
 
     
     fun {InitPlayers}
 
         %Create record with a feature for each remaining player
-        fun {InitPlayersLeft ID PLeft}
+        fun {InitRecord ID Value Rec}
             if Input.nbPlayer >= ID then
-                {InitPlayersLeft ID+1  {Adjoin f(ID:ID) PLeft}}
+                {InitRecord ID+1  Value {Adjoin f(ID:Value) Rec}}
             else
-                PLeft
+                Rec
             end
         end
 
@@ -50,7 +53,9 @@ in
         end
     in
         PortsPlayers = {InitPortsPlayers 1}
-        PlayersLeft = {InitPlayersLeft 1 f()}
+        PlayersLeft = {InitRecord 1 1 f()}
+        SurfaceStatus = {InitRecord 1 0 f()}
+        {System.show SurfaceStatus}
         {Init}
     end
 
@@ -61,32 +66,45 @@ in
             [] saySurface then
                 {Send H saySurface(ID)}
             [] sayMove then
-                {send H sayMove(ID Direction)}
+                {Send H sayMove(ID Direction)}
             end
-            {Broadcast Type PPorts ID Direction KindItem Position Drone}
-        [] then nil
+            {Broadcast Type T ID Direction KindItem Position Drone}
+        [] nil then skip
         end
     end
 
-    proc {TurnByTurn Current PLeft}
+    proc {TurnByTurn Current PLeft SStatus}
         {Delay Input.guiDelay}
         if {Record.width PLeft} > 1 then
             ID Position Direction
         in
+            %Check if correct player ID
             if Current =< Input.nbPlayer then
-                {Send {List.nth PortsPlayers Current} move(ID Position Direction)}
-                {Wait ID}
-                {Wait Position}
-                {Wait Direction}
-                if Direction == surface then
-                    {Broadcast saySurface PortsPlayers ID Direction nil Position nil}
-                    {Send PortGUI surface(ID)}
+
+                %Check surface countdown
+                {System.show nbTourRestant}
+                {System.show SStatus.Current}
+                if SStatus.Current == 0 then
+                    {Send {List.nth PortsPlayers Current} move(ID Position Direction)}
+                    {Wait ID}
+                    {Wait Position}
+                    {Wait Direction}
+                    if Direction == surface then
+                        %{Broadcast saySurface PortsPlayers ID Direction nil Position nil}
+                        {Send PortGUI surface(ID)}
+                        {System.show lorsdelasurface}
+                        {System.show ID}
+                        {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:Input.turnSurface)}}
+                    else
+                        {Send PortGUI movePlayer(ID Position)}
+                        {TurnByTurn Current+1 PLeft SStatus}
+                    end
                 else
-                    {Send PortGUI movePlayer(ID Position)}
+                    {System.show reduction}
+                    {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:SStatus.Current - 1)}}
                 end
-                {TurnByTurn Current+1 PLeft}
             else
-                {TurnByTurn 1 PLeft}
+                {TurnByTurn 1 PLeft SStatus}
             end
         else
             {System.show {List.nth {Record.toList PLeft} 1}}
@@ -97,6 +115,6 @@ in
     {Send PortGUI buildWindow}
     
     {InitPlayers PortsPlayers}
-    {TurnByTurn 1 PlayersLeft}
+    {TurnByTurn 1 PlayersLeft SurfaceStatus}
 
 end
