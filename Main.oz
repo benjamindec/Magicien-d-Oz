@@ -11,7 +11,7 @@ define
     TurnByTurn
     PlayersLeft
     SurfaceStatus
-
+    RecordWeapons
     Broadcast
 
 in
@@ -54,8 +54,8 @@ in
     in
         PortsPlayers = {InitPortsPlayers 1}
         PlayersLeft = {InitRecord 1 1 f()}
-        SurfaceStatus = {InitRecord 1 0 f()}
-        {System.show SurfaceStatus}
+        SurfaceStatus = {InitRecord 1 ~1 f()}
+        RecordWeapons = {InitRecord 1 weapons(mine:0 missile:0 drone:0 sonar:0) players()}
         {Init}
     end
 
@@ -73,38 +73,57 @@ in
         end
     end
 
-    proc {TurnByTurn Current PLeft SStatus}
+    proc {TurnByTurn Current PLeft SStatus FirstTurn TrackWeapons}
         {Delay Input.guiDelay}
+        
         if {Record.width PLeft} > 1 then
-            ID Position Direction
+            ID Position Direction KindFire 
         in
             %Check if correct player ID
             if Current =< Input.nbPlayer then
-
                 %Check surface countdown
-                {System.show nbTourRestant}
-                {System.show SStatus.Current}
-                if SStatus.Current == 0 then
+                if SStatus.Current =< 0 then
+
+                    %Dive if surface
+                    if FirstTurn orelse SStatus.Current == 0 then
+                        {Send {List.nth PortsPlayers Current} dive()}
+                    end
+                    
+                    %Move
                     {Send {List.nth PortsPlayers Current} move(ID Position Direction)}
-                    {Wait ID}
-                    {Wait Position}
-                    {Wait Direction}
                     if Direction == surface then
                         %{Broadcast saySurface PortsPlayers ID Direction nil Position nil}
                         {Send PortGUI surface(ID)}
-                        {System.show lorsdelasurface}
-                        {System.show ID}
-                        {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:Input.turnSurface)}}
+                        {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:Input.turnSurface-1)} FirstTurn TrackWeapons}
                     else
                         {Send PortGUI movePlayer(ID Position)}
-                        {TurnByTurn Current+1 PLeft SStatus}
+
+                        %Charge items
+                        {System.show chargeputain}
+                        {Send {List.nth PortsPlayers Current} chargeItem(ID KindFire)}
+                        case KindFire of nil then skip
+                        [] missile then
+                            {System.show missilecharged}
+                        [] drone then
+                            {System.show dronecharged}
+                        [] sonar then
+                            {System.show sonarcharged}
+                        [] mine then
+                            {System.show minecharged}
+                        end
+
+                        case KindFire of nil then
+                            {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:~1)} FirstTurn TrackWeapons}
+                        [] _ then
+                            {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:~1)} FirstTurn {Adjoin TrackWeapons players(Current:{Adjoin TrackWeapons.Current weapons(KindFire:TrackWeapons.Current.KindFire + 1)})}}
+                        end
                     end
                 else
-                    {System.show reduction}
-                    {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:SStatus.Current - 1)}}
+                    {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:SStatus.Current - 1)} FirstTurn TrackWeapons}
                 end
             else
-                {TurnByTurn 1 PLeft SStatus}
+                {System.show TrackWeapons}
+                {TurnByTurn 1 PLeft SStatus false TrackWeapons}
             end
         else
             {System.show {List.nth {Record.toList PLeft} 1}}
@@ -115,6 +134,6 @@ in
     {Send PortGUI buildWindow}
     
     {InitPlayers PortsPlayers}
-    {TurnByTurn 1 PlayersLeft SurfaceStatus}
+    {TurnByTurn 1 PlayersLeft SurfaceStatus true RecordWeapons}
 
 end

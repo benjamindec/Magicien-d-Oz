@@ -14,10 +14,17 @@ define
     Surface
     RandomPos
     RandomDir
+    RandomWeapon
     MovePos
     MoveAllowed
     Visited
 in
+    fun {RandomWeapon}
+        Weapons = [mine missile sonar drone]
+    in
+        {List.nth Weapons ({OS.rand} mod {List.length Weapons}) + 1}
+    end
+
 
     fun {RandomPos}
         X Y Xfound Yfound
@@ -89,30 +96,42 @@ in
             {System.show Dir}
             Pt
         end
-    end 
+    end
+
 
     
-    proc{TreatStream Stream ID Position Weapon Surface Direction} % as as many parameters as you want
-
-        if Surface == 0 then
+    proc{TreatStream Stream ID Position Weapons Surface Direction} % as as many parameters as you want
+        
+        if {Not Surface} then
             case Stream of nil then skip
             [] initPosition(?ID2 ?Pos)|T then
                 Pos = {RandomPos}
                 ID2 = ID
-                {TreatStream T ID2 Pos|Position Weapon Surface Direction}
+                {TreatStream T ID2 Pos|Position Weapons Surface Direction}
             [] move(?ID2 ?Pos ?Dir)|T then
                 Dir = {RandomDir [north east south west] Position}
                 Pos = {MovePos Position.1 Dir}
                 ID2 = ID
-                case Dir of surface then
-                    {TreatStream T ID2 Pos|nil Weapon Surface Dir|Direction}
-                [] _ then
-                    {TreatStream T ID2 Pos|Position Weapon Surface Dir|Direction}
+                if Dir == surface then
+                    {TreatStream T ID2 Pos|nil Weapons true Dir|Direction}
+                else
+                    {TreatStream T ID2 Pos|Position Weapons Surface Dir|Direction}
                 end
             [] dive()|T then
-                skip
-            [] chargeItem(?ID ?KindItem)|T then
-                skip
+                {TreatStream T ID Position Weapons false Direction}
+            [] chargeItem(?ID2 ?KindItem)|T then
+                    Charge TmpW
+                in
+                    
+                    ID2 = ID
+                    TmpW = {RandomWeapon}
+                    Charge = {Adjoin Weapons weapons(TmpW:Weapons.TmpW + 1)}
+                    if Charge.TmpW > 0 andthen (Charge.TmpW mod Input.TmpW) == 0 then
+                        KindItem = TmpW
+                    else
+                        KindItem = nil
+                    end
+                    {TreatStream T ID2 Position Charge Surface Direction}
             [] fireItem(?ID ?KindFire)|T then
                 skip
             [] fireMine(?ID ?Mine)|T then
@@ -144,8 +163,11 @@ in
             [] sayDamageTaken(ID Damage LifeLeft)|T then
                 skip
             end
-        else
-            {TreatStream Stream ID Position Weapon Surface-1 Direction}
+        else 
+            case Stream of nil then skip
+            [] dive()|T then
+                {TreatStream T ID Position Weapons false Direction}
+            end
         end
     end
 
@@ -156,7 +178,7 @@ in
     in
         {NewPort Stream Port}
         thread
-            {TreatStream Stream id(id:ID color:Color name:ID) nil Weapon 1 Direction}
+            {TreatStream Stream id(id:ID color:Color name:ID) nil weapons(mine:0 missile:0 drone:0 sonar:0) false Direction}
         end
         Port
     end
