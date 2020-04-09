@@ -2,13 +2,14 @@ functor
 import
     GUI
     Input
+    OS
     PlayerManager
     System
 define
     PortGUI
     PortsPlayers
     InitPlayers
-    TurnByTurn
+    LaunchGame
     PlayersLeft
     SurfaceStatus
     RecordWeapons
@@ -16,6 +17,7 @@ define
     Remaining
     BroadcastProc
     BroadcastFun
+    HowMuchAlive
 
 in
 
@@ -40,6 +42,9 @@ in
             end
         end
 
+
+        
+
         %Initialise the game
         proc {Init PortsPlayers}
             case PortsPlayers of H|T then
@@ -47,8 +52,6 @@ in
                 
             in
                 {Send H initPosition(ID Position)}
-                {Wait ID}
-                {Wait Position}
                 {Send PortGUI initPlayer(ID Position)}
                 {Init T}
             [] _ then skip
@@ -95,34 +98,52 @@ in
 
     fun {BroadcastFun Type PPorts ID Direction KindItem Position Status}
         case PPorts of H|T then
-            Message
+            Message Answer
         in
+
+            {Send H isDead(Answer)}
             case Type of nil then skip
-            [] sayMissileExplode then
+            [] sayMissileExplode andthen {Not Answer} then
                 {Send H sayMissileExplode(ID Position Message)}
-            [] sayMineExplode then
+            [] sayMineExplode andthen {Not Answer} then
                 {Send H sayMineExplode(ID Position Message)}
+            [] _ then
+                Message = null
             end
-            {Wait Message}
             {BroadcastFun Type T ID Direction KindItem Position Message|Status}
         [] nil then Status
         end
     end
 
+    fun {HowMuchAlive PPorts Nb}
+        Answer
+    in
+        case PPorts of H|T then
+            {Send H isDead(Answer)}
+            if Answer then
+                {HowMuchAlive T Nb}
+            else
+                {HowMuchAlive T Nb+1}
+            end
+        [] nil then Nb
+        end
+    end
+
     fun {Remaining Messages Players PPorts}
         case Messages of H|T then
-            case H of nil then 
+            case H of null then 
                 {Remaining T Players PPorts}
             [] sayDamageTaken(ID Damage LifeLeft) then
                 TmpID = ID.id Temp
             in
+                {Send PortGUI lifeUpdate(ID LifeLeft)}
                 {BroadcastProc sayDamageTaken PPorts ID nil nil nil nil nil Damage LifeLeft}
                 Temp = {Adjoin Players f( TmpID : LifeLeft )}
                 {Remaining T  Temp PPorts}
                 
             [] sayDeath(ID) then
                 {BroadcastProc sayDeath PPorts ID nil nil nil nil nil nil nil}
-                {System.show {Record.subtract Players ID.id}}
+                {Send PortGUI removePlayer(ID)}
                 {Remaining T {Record.subtract Players ID.id} PPorts}
             end
         [] nil then
@@ -130,16 +151,36 @@ in
         end
     end
 
-    proc {TurnByTurn Current PLeft SStatus FirstTurn TrackWeapons TrackMines}
-        {Delay Input.guiDelay}
-        if {Record.width PLeft} > 1 then
-            ID Position Direction KindAim KindFire TrackChargedWeapons TrackFiredWeapons TrackPlacedMine TrackExplodedMine Mine PLeftMissiles PLeftMines
-        in
+    proc {LaunchGame Current PLeft SStatus FirstTurn TrackWeapons TrackMines}
+        Answer Victory
+    in
+        if {Not Input.isTurnByTurn} then
+            {Send {List.nth PortsPlayers Current} isDead(Answer)}
+            Victory = {HowMuchAlive PortsPlayers 0}
+            
+        else
+            Victory = 1
+            Answer = true
+        end
+        
+        if ({Record.width PLeft} > 1 andthen Input.isTurnByTurn) orelse ({Not Input.isTurnByTurn} andthen  {Not Answer} andthen Victory > 1) then
+            ID Position Direction KindAim KindFire Next TrackChargedWeapons TrackFiredWeapons TrackPlacedMine TrackExplodedMine Mine PLeftMissiles PLeftMines 
+        in  
+            if Input.isTurnByTurn then
+                Next = Current + 1
+                %{Delay Input.guiDelay}
+            else
+                Next = Current
+                {Delay (({OS.rand} mod (Input.thinkMax - Input.thinkMin)) + Input.thinkMin)}
+            end
             %Check if correct player ID
+            
+            
             if Current =< Input.nbPlayer then
                 %Check surface countdown
-                if SStatus.Current =< 0 then
-
+                
+                if (SStatus.Current =< 0 orelse {Not Input.isTurnByTurn}) then
+                   
                     %Dive if surface
                     if FirstTurn orelse SStatus.Current == 0 then
                         {Send {List.nth PortsPlayers Current} dive()}
@@ -147,32 +188,32 @@ in
                     
                     %Move
                     {Send {List.nth PortsPlayers Current} move(ID Position Direction)}
+                    
                     if Direction == surface then
                         {Send PortGUI surface(ID)}
                         {BroadcastProc saySurface PortsPlayers ID Direction nil Position nil nil nil nil}
-                        {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:Input.turnSurface-1)} FirstTurn TrackWeapons TrackMines}
+                        {LaunchGame Next PLeft {Adjoin SStatus f(Current:Input.turnSurface-1)} FirstTurn TrackWeapons TrackMines}
+                        if {Not Input.isTurnByTurn} then
+                            {Delay Input.turnSurface * 1000}
+                        end
                     else
                         {Send PortGUI movePlayer(ID Position)}
                         {BroadcastProc sayMove PortsPlayers ID Direction nil Position nil nil nil nil}
-
+                       
                         %Charge item
                         {Send {List.nth PortsPlayers Current} chargeItem(ID KindAim)}
-                        case KindAim of nil then skip
+                        case KindAim of null then skip
                         [] missile then
-                            %{System.show missilecharged}
                             {BroadcastProc sayCharge PortsPlayers ID nil KindAim nil nil nil nil nil}
                         [] drone then
-                            %{System.show dronecharged}
                             {BroadcastProc sayCharge PortsPlayers ID nil KindAim nil nil nil nil nil}
                         [] sonar then
-                            {System.show sonarcharged}
                             {BroadcastProc sayCharge PortsPlayers ID nil KindAim nil nil nil nil nil}
                         [] mine then
-                            %{System.show minecharged}
                             {BroadcastProc sayCharge PortsPlayers ID nil KindAim nil nil nil nil nil}
                         end
 
-                        case KindAim of nil then
+                        case KindAim of null then
                             TrackChargedWeapons = TrackWeapons
                         [] _ then
                             TrackChargedWeapons = {Adjoin TrackWeapons players(Current:{Adjoin TrackWeapons.Current weapons(KindAim:TrackWeapons.Current.KindAim + 1)})}
@@ -181,27 +222,22 @@ in
 
                         %Fire item
                         {Send {List.nth PortsPlayers Current} fireItem(ID KindFire)}
-                        case KindFire of nil then skip
+                        case KindFire of null then skip
                         [] missile(pt(x:X y:Y)) then
                             MessagesMissiles
                         in
-                            %{System.show [missilefired X Y]}
                             MessagesMissiles = {BroadcastFun sayMissileExplode PortsPlayers ID nil nil pt(x:X y:Y) nil}
                             %Handle death by missile
                             PLeftMissiles = {Remaining MessagesMissiles PLeft  PortsPlayers}
                         [] mine(pt(x:X y:Y)) then
-                            %{System.show [minelanded X Y]}
                             TrackPlacedMine = {Adjoin TrackMines mines(Current:{List.append TrackMines.Current [pt(x:X y:Y)]})}
                             {Send PortGUI putMine(ID pt(x:X y:Y))}
                             {BroadcastProc sayMinePlaced PortsPlayers ID nil nil nil nil nil nil nil}
                         [] drone(row X) then
-                            {System.show [dronefired row X]}
                             {BroadcastProc sayPassingDrone PortsPlayers ID nil nil nil drone(row X) {List.nth PortsPlayers Current} nil nil}
                         [] drone(column Y) then
-                            {System.show [dronefired column Y]}
                             {BroadcastProc sayPassingDrone PortsPlayers ID nil nil nil drone(column Y) {List.nth PortsPlayers Current} nil nil}
                         [] sonar then
-                            {System.show sonar}
                             {BroadcastProc sayPassingSonar PortsPlayers ID nil nil nil nil {List.nth PortsPlayers Current} nil nil}
                         end
 
@@ -211,7 +247,7 @@ in
                         [] _ then skip
                         end
 
-                        case KindFire of nil then
+                        case KindFire of null then
                             TrackPlacedMine = TrackMines
                             TrackFiredWeapons = TrackChargedWeapons
                         [] _ then
@@ -238,22 +274,27 @@ in
                             PLeftMines = PLeftMissiles
                             TrackExplodedMine = TrackPlacedMine
                         end
-
                         
-
-
-                        {TurnByTurn Current+1 PLeftMines {Adjoin SStatus f(Current:~1)} FirstTurn TrackFiredWeapons TrackExplodedMine}
+                        {LaunchGame Next PLeftMines {Adjoin SStatus f(Current:~1)} FirstTurn TrackFiredWeapons TrackExplodedMine}
 
                     end
                 else
-                    {TurnByTurn Current+1 PLeft {Adjoin SStatus f(Current:SStatus.Current - 1)} FirstTurn TrackWeapons TrackMines}
+                    {LaunchGame Next PLeft {Adjoin SStatus f(Current:SStatus.Current - 1)} FirstTurn TrackWeapons TrackMines}
                 end
             else
-                {TurnByTurn 1 PLeft SStatus false TrackWeapons TrackMines}
+                {LaunchGame 1 PLeft SStatus false TrackWeapons TrackMines}
             end
         else
-            {System.show victoire}
-            {System.show PLeft}
+            Answ
+        in
+            {Send {List.nth PortsPlayers Current} isDead(Answ)}
+            if Victory == 1 andthen {Not Input.isTurnByTurn} andthen {Not Answ} then
+                {System.show [victoire Current]}
+            end
+
+            if Input.isTurnByTurn then
+                {System.show [victoire PLeft]}
+            end
         end
     end
 
@@ -261,6 +302,23 @@ in
     {Send PortGUI buildWindow}
     
     {InitPlayers PortsPlayers}
-    {TurnByTurn 1 PlayersLeft SurfaceStatus true RecordWeapons RecordMines}
+    if Input.isTurnByTurn then
+        {LaunchGame 1 PlayersLeft SurfaceStatus true RecordWeapons RecordMines}
+    else 
+        proc {LaunchSimultaneous PlayerID PlayersL SurfaceS RecordW RecordM}
+            if PlayerID =< Input.nbPlayer then
+                thread
+                    {LaunchGame PlayerID PlayersL SurfaceS true RecordW RecordM}
+                end
+                
+                {LaunchSimultaneous PlayerID+1 PlayersL SurfaceS RecordW RecordM}
+            else
+                skip
+            end
+
+        end
+    in
+        {LaunchSimultaneous 1 PlayersLeft SurfaceStatus RecordWeapons RecordMines}
+    end
 
 end

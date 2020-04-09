@@ -21,8 +21,7 @@ define
     Visited
 in
     fun {RandomWeapon}
-        %Weapons = [mine missile sonar drone]
-        Weapons = [mine missile]
+        Weapons = [mine missile sonar drone]
     in
         {List.nth Weapons ({OS.rand} mod {List.length Weapons}) + 1}
     end
@@ -82,7 +81,7 @@ in
             if {List.length WeaponList} > 1 then
                 {FireRandom {List.subtract WeaponList RandomW} Weapons Position}
             else
-                nil
+                null
             end
         end
     end
@@ -189,7 +188,7 @@ in
             if Charge.TmpW > 0 andthen (Charge.TmpW mod Input.TmpW) == 0 then
                 KindItem = TmpW
             else
-                KindItem = nil
+                KindItem = null
             end
             {TreatStream T ID2 Position Charge Surface Direction Mines Life}
         [] fireItem(?ID2 ?KindFire)|T andthen {Not Surface}  then
@@ -197,7 +196,7 @@ in
         in
             ID2 = ID
             KindFire = {FireRandom [missile drone sonar mine ] Weapons Position.1}
-            if {Record.label KindFire} == nil then
+            if {Record.label KindFire} == null then
                 {TreatStream T ID2 Position Weapons Surface Direction Mines Life}
             else
                 Label = {Record.label KindFire}
@@ -212,13 +211,14 @@ in
         [] fireMine(?ID2 ?Mine)|T andthen {Not Surface}  then
             NewMines
         in
+            
             ID2 = ID
             if {List.length Mines} > 0 then
                 Mine = {List.nth Mines (({OS.rand} mod {List.length Mines}) + 1)}
                 NewMines = {List.subtract Mines Mine}
             else
                 NewMines = Mines
-                Mine = nil
+                Mine = null
             end
             {TreatStream T ID2 Position Weapons Surface Direction NewMines Life}
         [] isDead(?Answer)|T then
@@ -229,45 +229,29 @@ in
             end
             {TreatStream T ID Position Weapons Surface Direction Mines Life}
         [] sayMove(ID2 Dir)|T then
-            if ID2.color \= ID.color then
-                %{System.show [le joueur ID2.color est parti vers Dir]}
-                skip
-            end
             {TreatStream T ID Position Weapons Surface Direction Mines Life}
         [] saySurface(ID2)|T then
-            if ID2.color \= ID.color then
-                {System.show [le joueur ID2.color est parti vers la surface]}
-            end
             {TreatStream T ID Position Weapons Surface Direction Mines Life}
         [] sayCharge(ID2 KindItem)|T then
-            if ID2.color \= ID.color then
-                skip
-                %{System.show [le joueur ID2.color a charger KindItem]}
-            end
             {TreatStream T ID Position Weapons Surface Direction Mines Life}
         [] sayMinePlaced(ID2)|T then
-            if ID2.color \= ID.color then
-                {System.show [le joueur ID2.color a placer une mine]}
-            end
             {TreatStream T ID Position Weapons Surface Direction Mines Life}
         [] sayMissileExplode(ID2 Pos ?Message)|T then
             Dist HP 
         in
             if ID2.color \= ID.color then
-                %{System.show [le joueur ID2.color exploser missile en Pos.x Pos.y]}
                 Dist = {Abs (Pos.x - Position.1.x)} + {Abs (Pos.y - Position.1.y)}
-                %{System.show Position}
-                %{System.show Dist}
                 case Dist of 0 then
+                    {System.show [ID.color Dist toucher par ID2.color missile Pos]}
                     HP = Life - 2
-                    Message = sayDamageTaken(ID 2 HP)
                     if HP > 0 then
                         Message = sayDamageTaken(ID 1 HP)
                     else
                         Message = sayDeath(ID)
                     end
                 [] 1 then
-                    HP = Life - 2
+                    {System.show [ID.color Dist toucher par ID2.color missile Pos]}
+                    HP = Life - 1
                     if HP > 0 then
                         Message = sayDamageTaken(ID 1 HP)
                     else
@@ -275,21 +259,19 @@ in
                     end
                 [] _ then
                     HP = Life
-                    Message = nil
+                    Message = null
                 end
                 {TreatStream T ID Position Weapons Surface Direction Mines HP}
             end
-            Message = nil
+            Message = null
             {TreatStream T ID Position Weapons Surface Direction Mines Life}
         [] sayMineExplode(ID2 Pos ?Message)|T then
             Dist HP
         in
             if ID2.color \= ID.color then
-                %{System.show [le joueur ID2.color exploser  mine Pos.x Pos.y]}
                 Dist = {Abs (Pos.x - Position.1.x)} + {Abs (Pos.y - Position.1.y)}
-                %{System.show Position}
-                %{System.show Dist}
                 case Dist of 0 then
+                    {System.show [ID.color Dist toucher par ID2.color mine Pos]}
                     HP = Life - 2
                     if HP > 0 then
                         Message = sayDamageTaken(ID 1 HP)
@@ -297,7 +279,8 @@ in
                         Message = sayDeath(ID)
                     end
                 [] 1 then
-                    HP = Life - 2
+                    {System.show [ID.color Dist toucher par ID2.color mine Pos]}
+                    HP = Life - 1
                     if HP > 0 then
                         Message = sayDamageTaken(ID 1 HP)
                     else
@@ -305,14 +288,13 @@ in
                     end
                 [] _ then
                     HP = Life
-                    Message = nil
+                    Message = null
                 end
                 {TreatStream T ID Position Weapons Surface Direction Mines HP}
             end
-            Message = nil
+            Message = null
             {TreatStream T ID Position Weapons Surface Direction Mines Life}
         [] sayPassingDrone(Drone ?ID2 ?Answer)|T then
-            {System.show [un drone passe en Drone]}
             case Drone of drone(row X) then
                 if X == Position.1.x then
                     Answer = true
@@ -328,7 +310,6 @@ in
             [] _ then 
                 Answer = false
             end
-            {System.show Answer}
             ID2 = ID
             {TreatStream T ID Position Weapons Surface Direction Mines Life}     
         [] sayAnswerDrone(Drone ID2 Answer)|T then
@@ -336,14 +317,12 @@ in
         [] sayPassingSonar(?ID2 ?Answer)|T then
             XorY
         in
-            {System.show [un sonar passe]}
             XorY = ({OS.rand} mod 2)
             case XorY of 0 then
                 Answer = pt(x:({OS.rand} mod Input.nRow) + 1 y:Position.1.y )
             [] 1 then
                 Answer = pt(x: Position.1.x y: ({OS.rand} mod Input.nColumn) + 1 )
             end
-            {System.show Answer}
             ID2 = ID
             {TreatStream T ID Position Weapons Surface Direction Mines Life}
         [] sayAnswerSonar(ID2 Answer)|T then

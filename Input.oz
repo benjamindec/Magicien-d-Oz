@@ -45,7 +45,7 @@ in
 
 %%%% Style of game %%%%
 
-   IsTurnByTurn = true
+   IsTurnByTurn = false
 
 %%%% Description of the map %%%%
 
@@ -65,9 +65,9 @@ in
 
 %%%% Players description %%%%
 
-   NbPlayer = 2
-   Players = [player1 player1]
-   Colors = [red green]
+   NbPlayer = 4
+   Players = [player1 player1 player1 player1]
+   Colors = [red green blue purple]
 
 %%%% Thinking parameters (only in simultaneous) %%%%
 
