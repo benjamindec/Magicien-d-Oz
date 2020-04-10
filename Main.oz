@@ -100,7 +100,7 @@ in
         case PPorts of H|T then
             Message Answer
         in
-
+            {System.show envoyerbroadccast}
             {Send H isDead(Answer)}
             case Type of nil then skip
             [] sayMissileExplode andthen {Not Answer} then
@@ -110,6 +110,7 @@ in
             [] _ then
                 Message = null
             end
+            {Wait Message}
             {BroadcastFun Type T ID Direction KindItem Position Message|Status}
         [] nil then Status
         end
@@ -119,13 +120,17 @@ in
         Answer
     in
         case PPorts of H|T then
+            {System.show [howmuchalive PPorts]}
             {Send H isDead(Answer)}
+            {Wait Answer}
             if Answer then
                 {HowMuchAlive T Nb}
             else
                 {HowMuchAlive T Nb+1}
             end
-        [] nil then Nb
+        [] nil then 
+            {System.show Nb}
+            Nb
         end
     end
 
@@ -155,8 +160,11 @@ in
         Answer Victory
     in
         if {Not Input.isTurnByTurn} then
+            {System.show launchgame}
             {Send {List.nth PortsPlayers Current} isDead(Answer)}
             Victory = {HowMuchAlive PortsPlayers 0}
+            {System.show loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooadddd}
+            {System.show Victory}
             
         else
             Victory = 1
@@ -171,7 +179,7 @@ in
                 %{Delay Input.guiDelay}
             else
                 Next = Current
-                {Delay (({OS.rand} mod (Input.thinkMax - Input.thinkMin)) + Input.thinkMin)}
+                %{Delay (({OS.rand} mod (Input.thinkMax - Input.thinkMin)) + Input.thinkMin)}
             end
             %Check if correct player ID
             
@@ -287,6 +295,7 @@ in
         else
             Answ
         in
+            {System.show victory}
             {Send {List.nth PortsPlayers Current} isDead(Answ)}
             if Victory == 1 andthen {Not Input.isTurnByTurn} andthen {Not Answ} then
                 {System.show [victoire Current]}
