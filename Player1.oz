@@ -387,7 +387,7 @@ in
             {TreatStream T ID2 Position Weapons Surface Direction NewMines Life Players Prey Item}
         [] isDead(?Answer)|T then
             {System.show isdeaaaaad}
-            if Life == 0 then
+            if Life =< 0 then
                 Answer = true
             else
                 Answer = false
