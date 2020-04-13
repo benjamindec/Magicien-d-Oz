@@ -92,7 +92,6 @@ in
         case PPorts of H|T then
             Message Answer
         in
-            {System.show envoyerbroadccast}
             {Send H isDead(Answer)}
             case Type of nil then skip
             [] sayMissileExplode andthen {Not Answer} then
@@ -102,7 +101,6 @@ in
             [] _ then
                 Message = null
             end
-            {Wait Message}
             {BroadcastFun Type T ID Direction KindItem Position Message|Status}
         [] nil then Status
         end
@@ -148,25 +146,23 @@ in
         end
     end
 
-    proc {LaunchGame Current SStatus FirstTurn}
-        Answer Victory
+    proc {LaunchGame Current SStatus FirstTurn Count}
+        Answer Victory Suicide 
     in
         if Current =< Input.nbPlayer then
-            {System.show launchgame}
+            
             {Send {List.nth PortsPlayers Current} isDead(Answer)}
             Victory = {HowMuchAlive PortsPlayers 0}
-            {System.show loooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooadddd}
-            {System.show Victory}
             if Victory > 1 then
                 ID Position Direction KindAim KindFire Next Mine PLeftMissiles PLeftMines 
             in 
                 
                 if Input.isTurnByTurn then
                     Next = Current + 1
-                    %{Delay Input.guiDelay}
+                    {Delay Input.guiDelay}
                 else
                     Next = Current
-                    %{Delay (({OS.rand} mod (Input.thinkMax - Input.thinkMin)) + Input.thinkMin)}
+                    {Delay (({OS.rand} mod (Input.thinkMax - Input.thinkMin)) + Input.thinkMin)}
                 end
                 %Check surface countdown
                 
@@ -176,19 +172,18 @@ in
                     if FirstTurn orelse SStatus.Current == 0 then
                         {Send {List.nth PortsPlayers Current} dive()}
                     end
-                    {System.show icicicicicicici}
                     %Move
-                    if Input.isTurnByTurn orelse {Not Answer} then
-                        {System.show lalalalalalalalalalalalalala}
+                    if (Input.isTurnByTurn andthen {Not Answer}) orelse {Not Answer} then
                         {Send {List.nth PortsPlayers Current} move(ID Position Direction)}
                     
                         if Direction == surface then
                             {Send PortGUI surface(ID)}
                             {BroadcastProc saySurface PortsPlayers ID Direction nil Position nil nil nil nil}
-                            {LaunchGame Next {Adjoin SStatus f(Current:Input.turnSurface-1)} FirstTurn}
+                            
                             if {Not Input.isTurnByTurn} then
                                 {Delay Input.turnSurface * 1000}
                             end
+                            {LaunchGame Next {Adjoin SStatus f(Current:Input.turnSurface-1)} FirstTurn Count+1}
                         else
                             {Send PortGUI movePlayer(ID Position)}
                         
@@ -227,42 +222,53 @@ in
                             [] sonar then
                                 {BroadcastProc sayPassingSonar PortsPlayers ID nil nil nil nil {List.nth PortsPlayers Current} nil nil}
                             end
+                            {Send {List.nth PortsPlayers Current} isDead(Suicide)}
 
-                            %Fire mine
-                            {Send {List.nth PortsPlayers Current} fireMine(ID Mine)}
-                            case Mine of pt(x:X y:Y) then
-                                MessagesMines
-                            in
-                                {Send PortGUI removeMine(ID Mine)}
-                                MessagesMines = {BroadcastFun sayMineExplode PortsPlayers ID nil nil pt(x:X y:Y) nil}
-                                %Handle death by mine
-                                {Remaining MessagesMines PortsPlayers}
-                            [] _ then
-                                skip
+                            if {Not Suicide} then
+
+                                %Fire mine
+                                {Send {List.nth PortsPlayers Current} fireMine(ID Mine)}
+                                case Mine of pt(x:X y:Y) then
+                                    MessagesMines
+                                in
+                                    {Send PortGUI removeMine(ID Mine)}
+                                    MessagesMines = {BroadcastFun sayMineExplode PortsPlayers ID nil nil pt(x:X y:Y) nil}
+                                    %Handle death by mine
+                                    {Remaining MessagesMines PortsPlayers}
+                                [] _ then
+                                    skip
+                                end
                             end
+                            {LaunchGame Next {Adjoin SStatus f(Current:~1)} FirstTurn Count+1}
                         end
-                        
-                        {LaunchGame Next {Adjoin SStatus f(Current:~1)} FirstTurn}
-
+                    else
+                        {LaunchGame Next {Adjoin SStatus f(Current:SStatus.Current - 1)} FirstTurn Count+1}
                     end
                 else
-                    {LaunchGame Next {Adjoin SStatus f(Current:SStatus.Current - 1)} FirstTurn}
+                    {LaunchGame Next {Adjoin SStatus f(Current:SStatus.Current - 1)} FirstTurn Count+1}
                 end
             else
                 Answ
             in
-                {System.show victory}
                 {Send {List.nth PortsPlayers Current} isDead(Answ)}
-                if Victory == 1 andthen {Not Input.isTurnByTurn} andthen {Not Answ} then
-                    {System.show [victoire Current]}
+                if {Not Answ} andthen Victory == 1 andthen {Not Input.isTurnByTurn}  then
+                    {System.show [victoire Current Count]}
+                else
+                    if Victory == 0 andthen {Not Input.isTurnByTurn} then 
+                        {System.show draw}
+                    end
                 end
 
                 if Input.isTurnByTurn then
-                    {System.show [victoire]}
+                    if Current == 1 then
+                        {System.show [victoire Input.nbPlayer]}
+                    else
+                        {System.show [victoire Current-1]}
+                    end
                 end
             end
         else
-            {LaunchGame 1 SStatus false}
+            {LaunchGame 1 SStatus false Count+1}
         end
     end
 
@@ -271,18 +277,17 @@ in
     
     {InitPlayers PortsPlayers}
     if Input.isTurnByTurn then
-        {LaunchGame 1 SurfaceStatus true}
+        {LaunchGame 1 SurfaceStatus true 0}
     else 
         proc {LaunchSimultaneous PlayerID SurfaceS}
             if PlayerID =< Input.nbPlayer then
                 thread
-                    {LaunchGame PlayerID SurfaceS true}
+                    {LaunchGame PlayerID SurfaceS true 0}
                 end
                 {LaunchSimultaneous PlayerID+1 SurfaceS}
             else
                 skip
             end
-
         end
     in
         {LaunchSimultaneous 1 SurfaceStatus}

@@ -65,8 +65,8 @@ in
 
 %%%% Players description %%%%
 
-   NbPlayer = 4
-   Players = [player1 player1 player1 player1]
+   NbPlayer = 2
+   Players = [player1 player2 player1 player1]
    Colors = [red green blue purple]
 
 %%%% Thinking parameters (only in simultaneous) %%%%
@@ -98,6 +98,6 @@ in
 
 %%%% Waiting time for the GUI between each effect %%%%
 
-   GUIDelay = 100 % ms
+   GUIDelay = 500 % ms
 
 end
