@@ -45,7 +45,7 @@ in
 
 %%%% Style of game %%%%
 
-   IsTurnByTurn = false
+   IsTurnByTurn = true
 
 %%%% Description of the map %%%%
 
@@ -65,14 +65,14 @@ in
 
 %%%% Players description %%%%
 
-   NbPlayer = 2
-   Players = [player1 player2 player1 player1]
+   NbPlayer = 4
+   Players = [fish fish fish fish]
    Colors = [red green blue purple]
 
 %%%% Thinking parameters (only in simultaneous) %%%%
 
-   ThinkMin = 500
-   ThinkMax = 3000
+   ThinkMin = 100
+   ThinkMax = 500
 
 %%%% Surface time/turns %%%%
 

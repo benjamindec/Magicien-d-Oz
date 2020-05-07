@@ -3,6 +3,7 @@ import
 	QTk at 'x-oz://system/wp/QTk.ozf'
 	Input
 	System
+	OS
 export
 	portWindow:StartWindow
 define
@@ -34,7 +35,27 @@ define
 	StateModification
 
 	UpdateLife
+
+	PlayMusic
+
+	MinePic
 in
+	MinePic = {QTk.newImage photo(file:'mine2.gif' height:35 width:35)}
+
+%%%%%
+
+proc{PlayMusic Event}
+	Sound StdinL StdoutL PidL
+in
+	case Event of endgame then Sound = 'five_points.mp3'|nil
+	[] start then Sound = 'do_you_best.mp3'|nil
+	[] mine then Sound = 'exercice_for_you.mp3'|nil
+	[] hit then Sound = 'a_bug.mp3'|nil
+	[] dead then Sound = 'so_nice.mp3'|nil
+	end
+
+	{OS.pipe mpg123 Sound PidL StdinL#StdoutL}
+end
 
 %%%%% Build the initial window and set it up (call only once)
 	fun{BuildWindow}
@@ -140,7 +161,7 @@ in
 			in
 			guiPlayer(id:ID score:HandleScore submarine:Handle mines:Mine path:Path) = State
 			pt(x:X y:Y) = Position
-			LabelMine = label(text:"M" handle:HandleMine borderwidth:5 relief:raised bg:ID.color ipadx:5 ipady:5)
+			LabelMine = label(text:"M" handle:HandleMine image: MinePic borderwidth:5 relief:raised bg:ID.color)
 			{Grid.grid configure(LabelMine row:X+1 column:Y+1)}
 			{HandleMine 'raise'()}
 			{Handle 'raise'()}
@@ -280,6 +301,9 @@ in
 		[] drone(ID Drone)|T then
 			{TreatStream T Grid State}
 		[] sonar(ID)|T then
+			{TreatStream T Grid State}
+		[] sound(Event)|T then
+			{PlayMusic Event}
 			{TreatStream T Grid State}
 		[] _|T then
 			{TreatStream T Grid State}

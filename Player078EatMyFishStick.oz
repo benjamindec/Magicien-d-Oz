@@ -174,8 +174,8 @@ in
         end
     end
 
-    fun {TrackPlayer Players ID Dir}
-        if {Record.width Players} == Input.nbPlayer-1  andthen Players.ID.x \= 0 then
+    fun {TrackPlayer Players ID Dir Remaining}
+        if {Value.hasFeature Players ID} andthen {Record.width Players} == Remaining-1  andthen Players.ID.x \= 0 then
             case Dir of surface then Players
             [] south andthen (Players.ID.x + 1) =< Input.nRow then {Adjoin Players players(ID:pt(x:Players.ID.x + 1 y:Players.ID.y))}
             [] north andthen (Players.ID.x - 1) >= 1 then {Adjoin Players players(ID:pt(x:Players.ID.x - 1 y:Players.ID.y))}
@@ -188,14 +188,16 @@ in
         end
     end
 
-    fun {FollowPrey Prey Players MyPos Directions Count Believe}
-        TmpPos Ind Dir ManDist = {Abs (MyPos.1.x - Players.Prey.x)} + {Abs (MyPos.1.y - Players.Prey.y)}
+    fun {FollowPrey Prey Players MyPos Directions Count Believe MyID}
+        TmpPos Ind Dir DirTmp ManDist = {Abs (MyPos.1.x - Players.Prey.x)} + {Abs (MyPos.1.y - Players.Prey.y)}
     in
-        if Count >= 5 then
+        
+        if {Value.hasFeature Players Prey} andthen Count =< 5 then
             if {List.length Directions} == 0 then
                 surface
             else
                 %NEW
+                
                 if Believe.Prey.x == 0 orelse Believe.Prey.x == 1 then
                     PosX DirX X
                 in
@@ -213,7 +215,7 @@ in
                     end
                 end
 
-                if Believe.Prey.y == 0 orelse Believe.Prey.y == 1 then
+                if (Believe.Prey.y == 0 orelse Believe.Prey.y == 1) andthen {Not {Value.isDet Dir}} then
                     PosY DirY Y
                 in
                     Y = MyPos.1.y - Players.Prey.y
@@ -224,12 +226,14 @@ in
                             DirY = west
                         end
                         PosY = {MovePos MyPos.1 DirY}
-                        if {MoveAllowed PosY} andthen {Not {Visited PosY MyPos}} then
+                        if {Not {Value.isDet Dir}} andthen {MoveAllowed PosY} andthen {Not {Visited PosY MyPos}} then
                             Dir = DirY
                         end
                     end
                 end
-
+                if {Not {Value.isDet Dir}} then
+                    Dir = random
+                end
                 case Dir of north then
                     Dir
                 [] south then
@@ -238,15 +242,17 @@ in
                     Dir
                 [] west then
                     Dir
-                [] _ then
+                [] random then
+                    DirF
+                in
                     Ind = ({OS.rand} mod {List.length Directions}) + 1
-                    {List.nth Directions Ind ?Dir}
-                    TmpPos = {MovePos MyPos.1 Dir}
+                    {List.nth Directions Ind ?DirF}
+                    TmpPos = {MovePos MyPos.1 DirF}
 
                     if {MoveAllowed TmpPos} andthen {Not {Visited TmpPos MyPos}} then
-                        Dir
+                        DirF
                     else
-                        {FollowPrey Prey Players MyPos {List.subtract Directions Dir} Count+1 Believe}
+                        {FollowPrey Prey Players MyPos {List.subtract Directions DirF} Count+1 Believe MyID}
                     end  
                 end
 
@@ -260,7 +266,7 @@ in
     fun {OnRange Players ID MyPos MyID Believe}
         Dist
     in
-        if MyID \= ID andthen {Record.width Players} > 0  andthen ID =< Input.nbPlayer andthen {Value.hasFeature Players ID} andthen Players.ID.x \= 0 andthen Believe.ID.x == 0 andthen Believe.ID.y == 0 then
+        if MyID \= ID andthen {Record.width Players} > 0  andthen ID =< Input.nbPlayer andthen {Value.hasFeature Players ID} andthen Players.ID.x \= 0 andthen ( (Believe.ID.x == 0  andthen Believe.ID.y == 0) orelse (Believe.ID.x == 1  andthen Believe.ID.y == 0) orelse (Believe.ID.x == 0  andthen Believe.ID.y == 1) )then
 
             Dist = {Abs (MyPos.x - Players.ID.x)} + {Abs (MyPos.y - Players.ID.y)}
             if Dist =< Input.maxDistanceMissile andthen Dist > 1 then
@@ -269,7 +275,11 @@ in
                 {OnRange Players ID+1 MyPos MyID Believe}
             end    
         else
-            nil
+            if ID > Input.nbPlayer then
+                nil
+            else
+                {OnRange Players ID+1 MyPos MyID Believe}
+            end
         end
     end
 
@@ -277,11 +287,9 @@ in
         fun {NearPlayer Players ID Mine MyID MyPos Believe}
             Dist MyDist
         in
-            %{System.show [ontesteeeeeeeeeeeeeeeee ID MyID Believe]}
-            if ID \= MyID andthen {Record.width Players} > 0  andthen ID =< Input.nbPlayer andthen {Value.hasFeature Players ID} andthen Players.ID.x \= 0 andthen (Believe.ID.x == 0 orelse Believe.ID.y == 0)  then
+            if ID \= MyID andthen {Record.width Players} > 0  andthen ID =< Input.nbPlayer andthen {Value.hasFeature Players ID} andthen Players.ID.x \= 0 andthen ( (Believe.ID.x == 0  andthen Believe.ID.y == 0) orelse (Believe.ID.x == 1  andthen Believe.ID.y == 0) orelse (Believe.ID.x == 0  andthen Believe.ID.y == 1) )  then
                 Dist = {Abs (Mine.x - Players.ID.x)} + {Abs (Mine.y - Players.ID.y)}
                 MyDist = {Abs (Mine.x - MyPos.x)} + {Abs (Mine.y - MyPos.y)}
-                {System.show [onrannnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnge Dist MyDist]}
                 if Dist =< 1 andthen MyDist > 1 then
                     true
                 else
@@ -289,7 +297,12 @@ in
                 end
             
             else
-                false
+                MyDist = {Abs (Mine.x - MyPos.x)} + {Abs (Mine.y - MyPos.y)}
+                if {List.length Mines} > 4 andthen MyDist > 1 then
+                    true
+                else
+                    false
+                end
             end
         end
     in
@@ -307,8 +320,8 @@ in
 
         if Id =< Input.nbPlayer then
             X Y
-        in
-            {System.show Players}
+        in  
+            
             if MyId \= Id andthen {Value.hasFeature Players Id} then
                 if Believe.Prey.x > Believe.Id.x then
                     X = 1
@@ -325,7 +338,7 @@ in
                 if (Y+X) == 2 then
                     Id
                 else
-                    if Id+1 > Input.nbPlayer orelse (Id+1 == MyId andthen Id+1 == Input.nbPlayer) orelse (Id+1 == Mort andthen Id+1 == Input.nbPlayer) then
+                    if (Id \= Mort) then
                         Id
                     else
                         {ChangePrey Prey Believe Id+1 MyId Players Mort}
@@ -403,31 +416,30 @@ in
     end
 
     
-    proc{TreatStream Stream ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining} % as as many parameters as you want
+    proc{TreatStream Stream ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion} % as as many parameters as you want
         
         case Stream of nil then skip
         [] initPosition(?ID2 ?Pos)|T andthen {Not Surface} then
             Pos = {RandomPos}
-            {System.show [maposdedepaaaart Pos]}
             ID2 = ID
-            {TreatStream T ID2 Pos|Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID2 Pos|Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
         [] move(?ID2 ?Pos ?Dir)|T andthen {Not Surface}  then
+            
             if Prey == nil then
                 Dir = {RandomDir [north east south west] Position}
             else
-                
-                Dir = {FollowPrey Prey Players Position [north east south west] 0 Believe}
+                Dir = {FollowPrey Prey Players Position [north east south west] 0 Believe ID.id}
             end
-            
             Pos = {MovePos Position.1 Dir}
             ID2 = ID
+            
             if Dir == surface then
-                {TreatStream T ID2 Pos|nil Weapons true Dir|Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+                {TreatStream T ID2 Pos|nil Weapons true Dir|Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
             else
-                {TreatStream T ID2 Pos|Position Weapons Surface Dir|Direction Mines Life Players Prey Item Believe Step SDTime Remaining} 
+                {TreatStream T ID2 Pos|Position Weapons Surface Dir|Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion} 
             end
         [] dive()|T then
-            {TreatStream T ID Position Weapons false Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID Position Weapons false Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
         [] chargeItem(?ID2 ?KindItem)|T andthen {Not Surface}  then
             Charge TmpW NextStep CurrentStep NewSDTime
         in
@@ -462,17 +474,16 @@ in
             else
                 KindItem = null
             end
-            {TreatStream T ID2 Position Charge Surface Direction Mines Life Players Prey TmpW Believe CurrentStep NewSDTime Remaining}
+            {TreatStream T ID2 Position Charge Surface Direction Mines Life Players Prey TmpW Believe CurrentStep NewSDTime Remaining LastExplosion}
         [] fireItem(?ID2 ?KindFire)|T andthen {Not Surface}  then
             Charge Label NewMines NextStep 
         in
             ID2 = ID
-
+            
             case Step of 1 then
                 if Weapons.sonar >= Input.sonar then
                     KindFire = sonar
                     NextStep = Step + 1
-                    {System.show sonaaaaaaaaaaar}
                 else
                     KindFire = null
                     NextStep = Step
@@ -486,20 +497,20 @@ in
                         KindFire = drone(row Players.Prey.y)
                     end
                     NextStep = Step + 1
-                    {System.show droooooooooooooooone}
                 else
                     KindFire = null
                     NextStep = Step
                 end
                 NewMines = Mines
             [] 3 then
-                {System.show [Weapons.missile {OnRange Players 1 Position.1 ID.id Believe}]}
                 if Weapons.missile >= Input.missile andthen {OnRange Players 1 Position.1 ID.id Believe} \= nil then
                     KindFire = {OnRange Players 1 Position.1 ID.id Believe} 
                     NewMines = Mines
                 else
                     if Weapons.mine >= Input.mine then
+                        
                         KindFire = {FireRandom [mine] Weapons Position.1}
+                        
                         NewMines = {List.append Mines [pt(x:KindFire.1.x y:KindFire.1.y)]}
                     else
                         NewMines = Mines
@@ -508,13 +519,14 @@ in
                 end
                 NextStep = Step
             end
+            
 
             if {Record.label KindFire} == null then
-                {TreatStream T ID2 Position Weapons Surface Direction Mines Life Players Prey Item Believe NextStep SDTime Remaining}
+                {TreatStream T ID2 Position Weapons Surface Direction Mines Life Players Prey Item Believe NextStep SDTime Remaining LastExplosion}
             else
                 Label = {Record.label KindFire}
                 Charge = {Adjoin Weapons weapons(Label:Weapons.Label - Input.Label)}
-                {TreatStream T ID2 Position Charge Surface Direction NewMines Life Players Prey Item Believe NextStep SDTime Remaining}
+                {TreatStream T ID2 Position Charge Surface Direction NewMines Life Players Prey Item Believe NextStep SDTime Remaining LastExplosion}
             end
         [] fireMine(?ID2 ?Mine)|T andthen {Not Surface}  then
             NewMines
@@ -527,14 +539,14 @@ in
                 NewMines = Mines
                 Mine = null
             end
-            {TreatStream T ID2 Position Weapons Surface Direction NewMines Life Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID2 Position Weapons Surface Direction NewMines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
         [] isDead(?Answer)|T then
             if Life =< 0 then
                 Answer = true
             else
                 Answer = false
             end
-            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
         [] sayMove(ID2 Dir)|T then
             if ID2.color \= ID.color then
                 NewPlayers
@@ -542,31 +554,26 @@ in
                 if {Record.width Players} \= Remaining-1 then
                     Tmp = {InitTrack Players 1 ID.id}
                 in
-                    NewPlayers = {TrackPlayer Tmp ID2.id Dir}
+                    NewPlayers = {TrackPlayer Tmp ID2.id Dir Remaining}
                 else
-                    NewPlayers = {TrackPlayer Players ID2.id Dir}
+                    NewPlayers = {TrackPlayer Players ID2.id Dir Remaining}
                 end
-                {System.show NewPlayers}
-                if Prey \= nil then
-                    {System.show [maproie NewPlayers.Prey Prey]}
-                end
-                {TreatStream T ID Position Weapons Surface Direction Mines Life NewPlayers Prey Item Believe Step SDTime Remaining}
+                {TreatStream T ID Position Weapons Surface Direction Mines Life NewPlayers Prey Item Believe Step SDTime Remaining LastExplosion}
             else
-                {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+                {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
             end
         [] saySurface(ID2)|T then
-            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
         [] sayCharge(ID2 KindItem)|T then
-            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
         [] sayMinePlaced(ID2)|T then
-            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
         [] sayMissileExplode(ID2 Pos ?Message)|T then
             Dist HP 
         in
             Dist = {Abs (Pos.x - Position.1.x)} + {Abs (Pos.y - Position.1.y)}
             case Dist of 0 then
                 HP = Life - 2
-                {System.show [player2 ID2.color a toucher ID.color avec missile Life HP en Pos]}
                 if HP > 0 then
                     Message = sayDamageTaken(ID 1 HP)
                 else
@@ -574,7 +581,6 @@ in
                 end
             [] 1 then
                 HP = Life - 1
-                {System.show [player2 ID2.color a toucher ID.color avec missile Life HP en Pos]}
                 if HP > 0 then
                     Message = sayDamageTaken(ID 1 HP)
                 else
@@ -584,7 +590,7 @@ in
                 HP = Life
                 Message = null
             end
-            {TreatStream T ID Position Weapons Surface Direction Mines HP Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID Position Weapons Surface Direction Mines HP Players Prey Item Believe Step SDTime Remaining Pos|LastExplosion}
             
             %Message = null
             %{TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item}
@@ -594,7 +600,6 @@ in
             
             Dist = {Abs (Pos.x - Position.1.x)} + {Abs (Pos.y - Position.1.y)}
             case Dist of 0 then
-                {System.show [ID2.color a toucher ID.color avec mine]}
                 HP = Life - 2
                 if HP > 0 then
                     Message = sayDamageTaken(ID 1 HP)
@@ -602,7 +607,6 @@ in
                     Message = sayDeath(ID)
                 end
             [] 1 then
-                {System.show [ID2.color a toucher ID.color avec mine]}
                 HP = Life - 1
                 if HP > 0 then
                     Message = sayDamageTaken(ID 1 HP)
@@ -613,28 +617,36 @@ in
                 HP = Life
                 Message = null
             end
-            {TreatStream T ID Position Weapons Surface Direction Mines HP Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID Position Weapons Surface Direction Mines HP Players Prey Item Believe Step SDTime Remaining Pos|LastExplosion}
             
             %Message = null
             %{TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item}
         [] sayPassingDrone(Drone ?ID2 ?Answer)|T then
-            case Drone of drone(row X) then
-                if X == Position.1.x then
-                    Answer = true
-                else
+
+            
+            if Life > 0 then
+                case Drone of drone(row X) then
+                    if X == Position.1.x then
+                        Answer = true
+                    else
+                        Answer = false
+                    end
+                [] drone(column Y) then
+                    if Y == Position.1.y then
+                        Answer = true
+                    else
+                        Answer = false
+                    end
+                [] _ then 
                     Answer = false
                 end
-            [] drone(column Y) then
-                if Y == Position.1.y then
-                    Answer = true
-                else
-                    Answer = false
-                end
-            [] _ then 
-                Answer = false
+                ID2 = ID
+            else
+                ID2 = null
+                Answer = null
             end
-            ID2 = ID
-            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}     
+           
+            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}     
         [] sayAnswerDrone(Drone ID2 Answer)|T then
             NewPlayers Id = ID2.id NewBelieve NewPrey
         in
@@ -657,7 +669,6 @@ in
                             NewPlayers = Players
                         end
                     end
-                    {System.show [Drone Believe NewBelieve Answer]}
 
                 [] drone(column Y) then
                     if Answer andthen Believe.Id.y == 0 then
@@ -676,24 +687,28 @@ in
                             NewPlayers = Players
                         end
                     end
-                    {System.show [Drone Believe NewBelieve Answer]}
                 [] _ then
                     NewBelieve = Believe
                     NewPlayers = Players
                 end
                 NewPrey = {ChangePrey Prey NewBelieve 1 ID.id NewPlayers 0}
-                {System.show [nouvelle proie NewPrey]}
-                {TreatStream T ID Position Weapons Surface Direction Mines Life NewPlayers NewPrey Item NewBelieve Step SDTime Remaining}
+                {TreatStream T ID Position Weapons Surface Direction Mines Life NewPlayers NewPrey Item NewBelieve Step SDTime Remaining LastExplosion}
             end
-            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
         [] sayPassingSonar(?ID2 ?Answer)|T then
-            if Input.nRow >= Input.nColumn then
-                Answer = pt(x:({OS.rand} mod Input.nRow) + 1 y:Position.1.y )
+
+            if Life > 0 then
+                if Input.nRow >= Input.nColumn then
+                    Answer = pt(x:({OS.rand} mod Input.nRow) + 1 y:Position.1.y )
+                else
+                    Answer = pt(x: Position.1.x y: ({OS.rand} mod Input.nRow) + 1 )
+                end
+                ID2 = ID
             else
-                Answer = pt(x: Position.1.x y: ({OS.rand} mod Input.nRow) + 1 )
+                ID2 = null
+                Answer = null
             end
-            ID2 = ID
-            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}
         [] sayAnswerSonar(ID2 Answer)|T then
             if ID2.color \= ID.color then
                 Id = ID2.id Trust
@@ -706,33 +721,66 @@ in
                         Trust = {Adjoin Believe info(Id:pt(x:0 y:2))}
                     end
                 else
-                    {System.show [Answer Players Believe]}
                     %RECALIBRATE
                     Trust = {Recalibrate ID2.id Answer Players Believe}
-                    {System.show Trust}
-                    {TreatStream T ID Position Weapons Surface Direction Mines Life Trust.1 Prey Item Trust.2 Step SDTime Remaining}
+                    {TreatStream T ID Position Weapons Surface Direction Mines Life Trust.1 Prey Item Trust.2 Step SDTime Remaining LastExplosion}
                     %Trust = Believe
                 end
-                {System.show [Id Answer]}
                 if Prey == nil then
-                    {TreatStream T ID Position Weapons Surface Direction Mines Life {Adjoin Players players(Id:Answer)} ID2.id Item Trust Step SDTime Remaining}
+                    {TreatStream T ID Position Weapons Surface Direction Mines Life {Adjoin Players players(Id:Answer)} ID2.id Item Trust Step SDTime Remaining LastExplosion}
                 else
-                    {TreatStream T ID Position Weapons Surface Direction Mines Life {Adjoin Players players(Id:Answer)} Prey Item Trust Step SDTime Remaining}
+                    {TreatStream T ID Position Weapons Surface Direction Mines Life {Adjoin Players players(Id:Answer)} Prey Item Trust Step SDTime Remaining LastExplosion}
                 end
             end
-            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}     
+            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining LastExplosion}     
         [] sayDeath(ID2)|T then
-            Id = ID2.id NewPlayers = {Record.subtract Players Id}
+            Id = ID2.id NewPlayers NewPrey
         in
+            NewPlayers = {Record.subtract Players Id}
             %(({OS.rand} mod {Record.width Players})+1)
-            {System.show [ciblemortemaisqui Id Prey]}
+            NewPrey = {ChangePrey Prey Believe 1 ID.id NewPlayers Id}
             if Id == Prey then
-                {System.show [proie morte changement]}
-                {TreatStream T ID Position Weapons Surface Direction Mines Life NewPlayers {ChangePrey Prey Believe 1 ID.id NewPlayers Id}  Item Believe Step SDTime Remaining-1}
+                {TreatStream T ID Position Weapons Surface Direction Mines Life NewPlayers NewPrey   Item Believe Step SDTime Remaining-1 LastExplosion}
             end
-            {TreatStream T ID Position Weapons Surface Direction Mines Life NewPlayers Prey Item Believe Step SDTime Remaining-1}   
+            {TreatStream T ID Position Weapons Surface Direction Mines Life NewPlayers Prey Item Believe Step SDTime Remaining-1 LastExplosion}   
         [] sayDamageTaken(ID2 Damage LifeLeft)|T then
-            {TreatStream T ID Position Weapons Surface Direction Mines Life Players Prey Item Believe Step SDTime Remaining}
+            NewPlayers NewBelieve Id = ID2.id
+        in
+            if ID2.color \= ID.color then
+                TrustX TrustY PosX PosY
+            in
+                %Changement de la Trust List
+                if Believe.Id.x > 0 then
+                    if Damage == 1 then
+                        TrustX = 1
+                    else
+                        TrustX = 0
+                    end
+                    PosX = LastExplosion.1.x
+                else
+                    TrustX = Believe.Id.x
+                    PosX = Players.Id.x
+                end
+
+                if Believe.Id.y > 0 then
+                    if Damage == 1 then
+                        TrustY = 1
+                    else
+                        TrustY = 0
+                    end
+                    PosY = LastExplosion.1.y
+                else
+                    TrustY = Believe.Id.y
+                    PosY = Players.Id.y
+                end
+
+                NewBelieve = {Adjoin Believe info(Id:pt(x:TrustX y:TrustY))}
+                NewPlayers = {Adjoin Players players(Id:pt(x:PosX y:PosY))}
+            else
+                NewBelieve = Believe
+                NewPlayers = Players
+            end
+            {TreatStream T ID Position Weapons Surface Direction Mines Life NewPlayers Prey Item NewBelieve Step SDTime Remaining LastExplosion}
         [] _ then 
             skip     
         end
@@ -745,7 +793,7 @@ in
     in
         {NewPort Stream Port}
         thread
-            {TreatStream Stream id(id:ID color:Color name:ID) nil weapons(mine:0 missile:0 drone:0 sonar:0) false Direction {List.make 0} Input.maxDamage {InitTrack players() 1 ID} nil nil info(ID:pt(x:2 y:2)) 1 0 Input.nbPlayer}
+            {TreatStream Stream id(id:ID color:Color name:ID) nil weapons(mine:0 missile:0 drone:0 sonar:0) false Direction {List.make 0} Input.maxDamage {InitTrack players() 1 ID} nil nil info(ID:pt(x:2 y:2)) 1 0 Input.nbPlayer nil}
         end
         Port
     end
